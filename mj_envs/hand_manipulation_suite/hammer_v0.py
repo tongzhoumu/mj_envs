@@ -147,3 +147,32 @@ class HammerEnvV0_sparse(HammerEnvV0):
         goal_achieved = True if np.linalg.norm(target_pos - goal_pos) < 0.010 else False
 
         return ob, float(goal_achieved), False, dict(goal_achieved=goal_achieved)
+    
+@register_gym_env(name="hammer_sparse-v1", max_episode_steps=200)
+class HammerEnvV1_sparse(HammerEnvV0):
+    # multi-stage reward
+    def step(self, a):
+        a = np.clip(a, -1.0, 1.0)
+        try:
+            a = self.act_mid + a * self.act_rng  # mean center and scale
+        except:
+            a = a  # only for the initialization phase
+        self.do_simulation(a, self.frame_skip)
+        ob = self.get_obs()
+
+        obj_pos = self.data.body_xpos[self.obj_bid].ravel()
+        # palm_pos = self.data.site_xpos[self.S_grasp_sid].ravel()
+        tool_pos = self.data.site_xpos[self.tool_sid].ravel()
+        target_pos = self.data.site_xpos[self.target_obj_sid].ravel()
+        goal_pos = self.data.site_xpos[self.goal_sid].ravel()
+
+        goal_achieved = True if np.linalg.norm(target_pos - goal_pos) < 0.010 else False
+        
+        if goal_achieved:
+            reward = 4
+        elif obj_pos[2] > 0.04 and tool_pos[2] > 0.04: # lifting up the hammer
+            reward = 2
+        else:
+            reward = 0
+
+        return ob, reward, False, dict(goal_achieved=goal_achieved)
