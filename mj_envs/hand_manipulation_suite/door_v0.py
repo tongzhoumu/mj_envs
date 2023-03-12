@@ -124,3 +124,21 @@ class DoorEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
                 num_success += 1
         success_percentage = num_success*100.0/num_paths
         return success_percentage
+
+from mj_envs.utils.registration import register_gym_env
+
+@register_gym_env(name="door_sparse-v0", max_episode_steps=200)
+class DoorEnvV0_sparse(DoorEnvV0):
+    def step(self, a):
+        a = np.clip(a, -1.0, 1.0)
+        try:
+            a = self.act_mid + a*self.act_rng # mean center and scale
+        except:
+            a = a                             # only for the initialization phase
+        self.do_simulation(a, self.frame_skip)
+        ob = self.get_obs()
+        door_pos = self.data.qpos[self.door_hinge_did]
+
+        goal_achieved = True if door_pos >= 1.35 else False
+
+        return ob, float(goal_achieved), False, dict(goal_achieved=goal_achieved)
