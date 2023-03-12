@@ -142,3 +142,37 @@ class PenEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
                 num_success += 1
         success_percentage = num_success*100.0/num_paths
         return success_percentage
+
+from mj_envs.utils.registration import register_gym_env
+
+@register_gym_env(name="pen_sparse-v0", max_episode_steps=100)
+class PenEnvV0_sparse(PenEnvV0):
+    def step(self, a):
+        a = np.clip(a, -1.0, 1.0)
+        try:
+            starting_up = False
+            a = self.act_mid + a*self.act_rng # mean center and scale
+        except:
+            starting_up = True
+            a = a                             # only for the initialization phase
+        self.do_simulation(a, self.frame_skip)
+
+        obj_pos  = self.data.body_xpos[self.obj_bid].ravel()
+        desired_loc = self.data.site_xpos[self.eps_ball_sid].ravel()
+        obj_orien = (self.data.site_xpos[self.obj_t_sid] - self.data.site_xpos[self.obj_b_sid])/self.pen_length
+        desired_orien = (self.data.site_xpos[self.tar_t_sid] - self.data.site_xpos[self.tar_b_sid])/self.tar_length
+
+        # pos cost
+        dist = np.linalg.norm(obj_pos-desired_loc)
+        # orien cost
+        orien_similarity = np.dot(obj_orien, desired_orien)
+
+
+        # penalty for dropping the pen
+        done = False
+        if obj_pos[2] < 0.075:
+            done = True if not starting_up else False
+
+        goal_achieved = True if (dist < 0.075 and orien_similarity > 0.95) else False
+
+        return self.get_obs(), float(goal_achieved), done, dict(goal_achieved=goal_achieved)
