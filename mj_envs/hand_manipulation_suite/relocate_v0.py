@@ -165,3 +165,31 @@ class RelocateEnvV1_sparse(RelocateEnvV0):
             reward = 0
 
         return ob, reward, False, dict(goal_achieved=goal_achieved)
+    
+
+@register_gym_env(name="relocate-v1", max_episode_steps=200)
+class RelocateEnvV1(RelocateEnvV0):
+    def step(self, a):
+        a = np.clip(a, -1.0, 1.0)
+        try:
+            a = self.act_mid + a*self.act_rng # mean center and scale
+        except:
+            a = a                             # only for the initialization phase
+        self.do_simulation(a, self.frame_skip)
+        ob = self.get_obs()
+        obj_pos  = self.data.body_xpos[self.obj_bid].ravel()
+        palm_pos = self.data.site_xpos[self.S_grasp_sid].ravel()
+        target_pos = self.data.site_xpos[self.target_obj_sid].ravel()
+
+        goal_achieved = True if np.linalg.norm(obj_pos-target_pos) < 0.1 else False
+
+        if goal_achieved:
+            reward = 4
+        elif obj_pos[2] > 0.04: # if object off the table
+            obj_to_target_dist = np.linalg.norm(obj_pos-target_pos)
+            reward = 3 - np.tanh(5 * obj_to_target_dist)
+        else:
+            palm_to_obj_dist = np.linalg.norm(palm_pos-obj_pos)
+            reward = 1 - np.tanh(5 * palm_to_obj_dist)
+
+        return ob, reward, False, dict(goal_achieved=goal_achieved)
