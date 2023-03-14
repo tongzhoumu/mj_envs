@@ -193,3 +193,14 @@ class RelocateEnvV1(RelocateEnvV0):
             reward = 1 - np.tanh(5 * palm_to_obj_dist)
 
         return ob, reward, False, dict(goal_achieved=goal_achieved)
+    
+
+@register_gym_env("relocate-v3", max_episode_steps=200)
+class RelocateEnvV3(RelocateEnvV1_sparse):
+    # stage indicator
+    def get_obs(self):
+        _obs = super().get_obs()
+        obj_pos  = self.data.body_xpos[self.obj_bid].ravel()
+        obj_off_table = (obj_pos[2] > 0.04)
+        return np.concatenate([_obs, [float(obj_off_table)]])
+    
